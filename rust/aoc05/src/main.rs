@@ -92,12 +92,12 @@ fn part1(input: &str) -> Result<()> {
 fn part2(input: &str) -> Result<()> {
     let mut seat_decoder = TicketDecoder::new();
 
-    let seat_ids: Vec<u64> = input
+    let seat_ids: Vec<u32> = input
         .lines()
         .map(|line| {
             seat_decoder.reset();
             let (r, c) = seat_decoder.find_seat(line);
-            (r as u64) * 8 + (c as u64)
+            (r as u32) * 8 + (c as u32)
         })
         .collect();
 
@@ -107,8 +107,8 @@ fn part2(input: &str) -> Result<()> {
     // the sum of those missing in the front as well as the seat ids that
     // we observe, leaving the missing seat id.
 
-    let mut seat_min = 1024;
-    let mut seat_max = 0;
+    let mut seat_min = u32::MAX;
+    let mut seat_max = u32::MIN;
     let mut s = 0;
 
     for &x in seat_ids.iter() {
