@@ -12,6 +12,10 @@ fn main() -> Result<()> {
     eprintln!("elapsed {:?}", start.elapsed());
 
     let start = std::time::Instant::now();
+    part1_v2(&input)?;
+    eprintln!("elapsed {:?}", start.elapsed());
+
+    let start = std::time::Instant::now();
     part2(&input)?;
     eprintln!("elapsed {:?}", start.elapsed());
 
@@ -35,6 +39,33 @@ fn part1(input: &str) -> Result<()> {
             }
         });
     let total: usize = group_answers.iter().map(|g| g.len()).sum();
+    println!("part 1 solution: {}", total);
+
+    Ok(())
+}
+
+fn part1_v2(input: &str) -> Result<()> {
+    // Use lookup table pulling that returns True for first time a character is seen, but
+    // no subsequent time so each letter is counted once per group
+    const OFFSET: usize = 'a' as usize;
+    let groups: Vec<Vec<&str>> = input.split("\n\n").map(|g| g.lines().collect()).collect();
+
+    let total: usize = groups
+        .iter()
+        .map(|g| {
+            let mut t = [true; 26];
+            g.iter()
+                .flat_map(|r| r.chars())
+                .filter(|&x| {
+                    let ix = (x as usize) - OFFSET;
+                    let y = t[ix];
+                    t[ix] = false;
+                    y
+                })
+                .count()
+        })
+        .sum();
+
     println!("part 1 solution: {}", total);
 
     Ok(())
