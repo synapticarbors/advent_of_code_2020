@@ -45,7 +45,7 @@ impl BootProc {
                 Ops::JMP(x) => self.idx += x,
                 Ops::ACC(x) => {
                     self.idx += 1;
-                    self.acc += x
+                    self.acc += x;
                 }
             }
         }
