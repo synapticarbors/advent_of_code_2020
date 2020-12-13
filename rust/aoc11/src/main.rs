@@ -119,8 +119,8 @@ impl WaitingRoom {
             .chars()
             .count();
 
-        let mut seats = Vec::new();
-        let mut curr_seat_status = Vec::new();
+        let mut seats = Vec::with_capacity(nrows * ncols);
+        let mut curr_seat_status = Vec::with_capacity(nrows * ncols);
 
         for line in input.lines() {
             for c in line.chars() {
