@@ -99,6 +99,7 @@ fn part2(input: &str) -> Result<()> {
                     90 => (0, s, -s, 0),
                     180 => (-1, 0, 0, -1),
                     270 => (0, -s, s, 0),
+                    360 => (1, 0, 0, 1),
                     _ => unreachable!(),
                 };
                 let x = a * acc.wayp[0] + b * acc.wayp[1];
