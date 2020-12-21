@@ -99,21 +99,6 @@ struct Tile {
     raw_image: Vec<String>,
 }
 
-fn main() -> Result<()> {
-    let mut input = String::new();
-    io::stdin().read_to_string(&mut input)?;
-
-    let start = std::time::Instant::now();
-    part1(&input)?;
-    eprintln!("elapsed {:?}", start.elapsed());
-
-    let start = std::time::Instant::now();
-    part2(&input)?;
-    eprintln!("elapsed {:?}", start.elapsed());
-
-    Ok(())
-}
-
 #[derive(Debug)]
 struct PlacedTile<'a> {
     tile: &'a Tile,
@@ -229,7 +214,9 @@ fn get_starting_orientation(t: &Tile, tiles: &[Tile]) -> usize {
     unreachable!();
 }
 
-fn solve_puzzle(tiles: &[Tile]) -> HashMap<(u8, u8), PlacedTile> {
+type PuzzleSolution<'a> = HashMap<(u8, u8), PlacedTile<'a>>;
+
+fn solve_puzzle(tiles: &[Tile]) -> PuzzleSolution {
     let ntiles = tiles.len();
     let psize = (ntiles as f64).sqrt() as u32;
     let corner_tiles_ids = find_corners(&tiles);
@@ -357,6 +344,202 @@ fn solve_puzzle(tiles: &[Tile]) -> HashMap<(u8, u8), PlacedTile> {
     solution
 }
 
+fn flip_image(img: &[String]) -> Vec<String> {
+    img.iter().map(|r| r.chars().rev().collect()).collect()
+}
+
+fn rotate_image(img: &[String]) -> Vec<String> {
+    let n = img[0].len();
+    let mut rot = vec![];
+
+    for i in (0..n).rev() {
+        let a = img
+            .iter()
+            .map(|x| x.chars().nth(i).unwrap())
+            .collect::<String>();
+
+        rot.push(a);
+    }
+
+    rot
+}
+
+fn rotate_n_image(img: &[String], n: u8) -> Vec<String> {
+    let mut rot: Vec<String> = img.iter().map(|x| x.to_owned()).collect();
+    let mut i = 1;
+
+    while i <= n {
+        rot = rotate_image(&rot);
+        i += 1;
+    }
+
+    rot
+}
+
+fn trim_image(mut img: Vec<String>) -> Vec<String> {
+    img.pop();
+    img.remove(0);
+
+    img = img
+        .iter_mut()
+        .map(|x| {
+            x.pop();
+            x.remove(0);
+            x.clone()
+        })
+        .collect();
+
+    img
+}
+
+fn all_orientations(img: &[String]) -> Vec<Vec<String>> {
+    let mut out = Vec::new();
+    let i0: Vec<String> = img.iter().map(|x| x.to_owned()).collect();
+    let i1 = rotate_image(&i0);
+    let i2 = rotate_image(&i1);
+    let i3 = rotate_image(&i2);
+    let i4 = flip_image(&i0);
+    let i5 = rotate_image(&i4);
+    let i6 = rotate_image(&i5);
+    let i7 = rotate_image(&i6);
+
+    out.push(i0);
+    out.push(i1);
+    out.push(i2);
+    out.push(i3);
+    out.push(i4);
+    out.push(i5);
+    out.push(i6);
+    out.push(i7);
+
+    out
+}
+
+fn image2array(img: &[String]) -> Vec<Vec<bool>> {
+    let mut out = vec![];
+
+    for line in img.iter() {
+        out.push(
+            line.chars()
+                .map(|c| match c {
+                    '1' => true,
+                    '0' => false,
+                    _ => unreachable!(),
+                })
+                .collect(),
+        );
+    }
+
+    out
+}
+
+fn assemble_image(soln: &PuzzleSolution) -> Vec<String> {
+    // Trim and orient tiles
+    let img_pieces: HashMap<(u8, u8), Vec<String>> =
+        soln.iter().fold(HashMap::new(), |mut acc, (key, pt)| {
+            let oid = pt.oid;
+            let mut img: Vec<String> = pt.tile.raw_image.iter().map(|x| x.to_owned()).collect();
+            img = trim_image(img);
+
+            if oid >= 4 {
+                img = flip_image(&img);
+            }
+
+            let img = match oid {
+                0 | 4 => img,
+                _ => rotate_n_image(&img, oid as u8 % 4),
+            };
+
+            acc.insert(*key, img);
+            acc
+        });
+
+    // Combine into single image
+    let psize = (soln.len() as f64).sqrt() as u32;
+    let tsize = img_pieces.get(&(0, 0)).unwrap()[0].len();
+
+    let mut assembled_img = vec![];
+
+    for i in 0..psize {
+        let mut row_tiles = vec![];
+        for j in 0..psize {
+            row_tiles.push(img_pieces.get(&(i as u8, j as u8)).unwrap());
+        }
+
+        for ri in 0..tsize {
+            let r = row_tiles.iter().fold(String::new(), |mut acc, t| {
+                acc.push_str(&t[ri]);
+                acc
+            });
+
+            assembled_img.push(r);
+        }
+    }
+
+    assembled_img
+}
+
+// Monster
+//                   #
+//#    ##    ##    ###
+// #  #  #  #  #  #
+const MONSTER: [(usize, usize); 15] = [
+    (1, 0),
+    (2, 1),
+    (2, 4),
+    (1, 5),
+    (1, 6),
+    (2, 7),
+    (2, 10),
+    (1, 11),
+    (1, 12),
+    (2, 13),
+    (2, 16),
+    (1, 17),
+    (0, 18),
+    (1, 18),
+    (1, 19),
+];
+
+const MONSTER_H: usize = 3;
+const MONSTER_W: usize = 20;
+
+fn find_monsters(img: &[String]) -> u32 {
+    let mut n_found = 0;
+
+    for oimg in all_orientations(&img).iter() {
+        let x = image2array(&oimg);
+        let xsz = x.len();
+
+        for i in 0..xsz - MONSTER_H {
+            for j in 0..xsz - MONSTER_W {
+                if MONSTER.iter().all(|(mi, mj)| x[i + mi][j + mj]) {
+                    n_found += 1;
+                }
+            }
+        }
+    }
+
+    println!("n_found: {}", n_found);
+
+    n_found
+}
+
+fn main() -> Result<()> {
+    let mut input = String::new();
+    io::stdin().read_to_string(&mut input)?;
+
+    let start = std::time::Instant::now();
+    part1(&input)?;
+    eprintln!("elapsed {:?}", start.elapsed());
+
+    let start = std::time::Instant::now();
+    part2(&input)?;
+    eprintln!("elapsed {:?}", start.elapsed());
+
+    Ok(())
+}
+
 fn part1(input: &str) -> Result<()> {
     let tiles = parse_input(input)?;
     let corner_tiles_ids = find_corners(&tiles);
@@ -372,6 +555,20 @@ fn part1(input: &str) -> Result<()> {
 fn part2(input: &str) -> Result<()> {
     let tiles = parse_input(input)?;
     let solved = solve_puzzle(&tiles);
+
+    let aimg = assemble_image(&solved);
+
+    let hashes_per_monster: u32 = 15;
+    let number_of_monsters: u32 = find_monsters(&aimg);
+    let total_hashes = aimg.iter().fold(0, |mut acc, line| {
+        acc += line.matches('1').count();
+        acc
+    }) as u32;
+
+    println!(
+        "part 2 solution: {}",
+        total_hashes - number_of_monsters * hashes_per_monster
+    );
 
     Ok(())
 }
