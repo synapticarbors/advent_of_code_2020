@@ -520,8 +520,6 @@ fn find_monsters(img: &[String]) -> u32 {
         }
     }
 
-    println!("n_found: {}", n_found);
-
     n_found
 }
 
