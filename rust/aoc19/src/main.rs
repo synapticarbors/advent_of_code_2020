@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::io::{self, Read};
 
 use peg;
+use regex::Regex;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -46,8 +47,6 @@ fn parse_input(input: &str) -> Result<(HashMap<u16, Rule>, &str)> {
     let raw_rules = it.next().ok_or("Could not split rules")?;
     let raw_messages = it.next().ok_or("Could not split messages")?;
 
-    //let rule_set: HashMap<u16, Rule> = HashMap::new();
-
     let rule_set = raw_rules
         .lines()
         .map(|line| {
@@ -57,6 +56,41 @@ fn parse_input(input: &str) -> Result<(HashMap<u16, Rule>, &str)> {
         .collect::<Result<_>>()?;
 
     Ok((rule_set, raw_messages))
+}
+
+fn build_regex(
+    rid: Option<u16>,
+    rule: &Rule,
+    rules: &HashMap<u16, Rule>,
+    re_cache: &mut HashMap<u16, String>,
+) -> String {
+    if let Some(x) = rid {
+        if let Some(cached) = re_cache.get(&x) {
+            return cached.clone();
+        }
+    }
+
+    let re_part = match rule {
+        Rule::Lit(c) => c.to_string(),
+        Rule::Seq(s) => format!(
+            "(?:{})",
+            s.iter()
+                .map(|r| build_regex(Some(*r), rules.get(r).unwrap(), rules, re_cache))
+                .collect::<Vec<_>>()
+                .join("")
+        ),
+        Rule::Or(a, b) => format!(
+            "(?:{}|{})",
+            build_regex(None, &Rule::Seq(a.to_vec()), rules, re_cache),
+            build_regex(None, &Rule::Seq(b.to_vec()), rules, re_cache)
+        ),
+    };
+
+    if let Some(x) = rid {
+        re_cache.insert(x, re_part.clone());
+    }
+
+    re_part
 }
 
 fn main() -> Result<()> {
@@ -77,11 +111,58 @@ fn main() -> Result<()> {
 fn part1(input: &str) -> Result<()> {
     let (rule_set, messages) = parse_input(input)?;
 
-    println!("{:?}", rule_set);
+    let mut re_cache = HashMap::new();
+    let re_str = format!(
+        "^{}$",
+        build_regex(Some(0), rule_set.get(&0).unwrap(), &rule_set, &mut re_cache)
+    );
+
+    let re = Regex::new(&re_str)?;
+
+    let soln = messages.lines().filter(|m| re.is_match(m)).count();
+
+    println!("part 1 solution: {}", soln);
     Ok(())
 }
 
 fn part2(input: &str) -> Result<()> {
+    let (rule_set, messages) = parse_input(input)?;
+
+    let mut re_cache = HashMap::new();
+
+    let rule42 = build_regex(
+        Some(42),
+        rule_set.get(&42).unwrap(),
+        &rule_set,
+        &mut re_cache,
+    );
+
+    re_cache.insert(8, format!("{}+", rule42));
+
+    let rule31 = build_regex(
+        Some(31),
+        rule_set.get(&31).unwrap(),
+        &rule_set,
+        &mut re_cache,
+    );
+
+    let rule_11_proxy = (1..=4)
+        .map(|i| format!("(?:{}{{{}}}{}{{{}}})", rule42, i, rule31, i))
+        .collect::<Vec<_>>()
+        .join("|");
+
+    re_cache.insert(11, format!("(?:{})", rule_11_proxy));
+
+    let re_str = format!(
+        "^{}$",
+        build_regex(Some(0), rule_set.get(&0).unwrap(), &rule_set, &mut re_cache)
+    );
+
+    let re = Regex::new(&re_str)?;
+
+    let soln = messages.lines().filter(|m| re.is_match(m)).count();
+
+    println!("part 2 solution: {}", soln);
     Ok(())
 }
 
